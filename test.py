@@ -22,15 +22,54 @@ def post_message():
     headers = {
         "Authorization": f"Bearer {data['access_token']}"
     }
+
+    record = {
+        "text": data['text'],
+        "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    }
+
+    if 'image' in data:
+        record["embed"] = {
+            "$type": "app.bsky.embed.images",
+            "images": [
+                {
+                    "alt": data.get("alt", "image"),
+                    "image": {
+                        "$type": "blob",
+                        "ref": {
+                            "$link": data['image']['blob_link']
+                        },
+                        "mimeType": data['image']['mime_type'],
+                        "size": data['image']['size']
+                    }
+                }
+            ]
+        }
+
     payload = {
         "repo": data['repo'],
         "collection": "app.bsky.feed.post",
-        "record": {
-            "text": data['text'],
-            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        }
+        "record": record
     }
+
     res = requests.post("https://bsky.social/xrpc/com.atproto.repo.createRecord", headers=headers, json=payload)
+    return jsonify(res.json()), res.status_code
+
+@app.route('/upload-image', methods=['POST'])
+def upload_image():
+    access_token = request.headers.get('Authorization')
+    image = request.files['image']
+
+    headers = {
+        "Authorization": access_token,
+        "Content-Type": image.mimetype
+    }
+
+    res = requests.post(
+        "https://bsky.social/xrpc/com.atproto.repo.uploadBlob",
+        headers=headers,
+        data=image.read()
+    )
     return jsonify(res.json()), res.status_code
 
 # list
